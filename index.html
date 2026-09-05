@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✨ Dayi Portal</title>
+<style>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🎨 模块0: 全局配色变量                                       ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ 修改方法: 改下面的色值即可全局换色                      │    ║
+   ║  │ --gold     = 主金色（标签、装饰线、悬浮高亮）          │    ║python -m http.server 8000
+   ║  │ --dark     = 描边色（所有卡通线条颜色）                │    ║http://localhost:8000
+   ║  │ --cream    = 页面底色                                 │    ║
+   ║  │ --pink     = 音乐播放态高亮色                         │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+:root {
+  --gold: #FFD700;
+  --gold-light: #FFED4A;
+  --gold-deep: #E6A800;
+  --amber: #FF9500;
+  --cream: #FFFCF0;
+  --white: #FFFFFF;
+  --dark: #3D2200;
+  --outline: #3D2200;
+  --card-bg: rgba(255,255,255,0.93);
+  --pink: #FF6B9D;
+  --pink-light: #FFB3D0;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--dark);
+}
+body { background: var(--cream); }
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🎨 模块1: 背景系统（3层叠加）                                ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ 第1层 .bg-sky: 渐变天空底色                           │    ║
+   ║  │   → 改 background 里的色标换色调                      │    ║
+   ║  │   → 改 animation duration 换流动速度                  │    ║
+   ║  │                                                       │    ║
+   ║  │ 第2层 .bg-grid: 网格线                                │    ║
+   ║  │   → 改 59px 改格子大小                                │    ║
+   ║  │   → 改 rgba 的 0.06 改线条深浅（0=消失 1=最深）       │    ║
+   ║  │                                                       │    ║
+   ║  │ 第3层 .bg-diagonal: 斜纹线                            │    ║
+   ║  │   → 改 -45deg 改角度                                  │    ║
+   ║  │   → 改 28px 改间距                                    │    ║
+   ║  │   → 改 0.035 改深浅                                   │    ║
+   ║  │                                                       │    ║
+   ║  │ 隐藏某层: 在对应 .bg-xxx 后加 display:none             │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.bg-layer { position: fixed; inset: 0; pointer-events: none; }
+
+.bg-sky {
+  z-index: -3;
+  background: linear-gradient(160deg, #FFFDE7 0%, #FFF8E1 20%, #FFECB3 40%, #FFE0B2 60%, #FFCCBC 80%, #F3E5F5 100%);
+  background-size: 300% 300%;
+  animation: sky-drift 25s ease-in-out infinite alternate;
+}
+@keyframes sky-drift { 0%{background-position:0% 0%} 100%{background-position:100% 100%} }
+
+.bg-grid {
+  z-index: -2;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,180,0,0.06) 59px, rgba(255,180,0,0.06) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,180,0,0.06) 59px, rgba(255,180,0,0.06) 60px);
+}
+
+.bg-diagonal {
+  z-index: -1;
+  background: repeating-linear-gradient(-45deg, transparent, transparent 28px, rgba(255,200,0,0.035) 28px, rgba(255,200,0,0.035) 30px);
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  📐 模块2: 主容器 & 页面滑动                                   ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ width: 300vw = 3页，加第4页改为 400vw                 │    ║
+   ║  │ transition 调切换速度(0.7s)和缓动曲线                 │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+#app {
+  display: flex;
+  width: 300vw; height: 100vh;
+  transition: transform 0.7s cubic-bezier(.22,1,.36,1);
+  position: relative; z-index: 1;
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  📄 模块3: 单页容器                                          ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ padding 改内边距                                      │    ║
+   ║  │ ::-webkit-scrollbar 改滚动条样式/颜色                 │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.page {
+  width: 100vw; height: 100vh;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 36px 28px 140px;
+  scroll-behavior: smooth;
+}
+.page::-webkit-scrollbar { width: 6px; }
+.page::-webkit-scrollbar-track { background: transparent; }
+.page::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🏷️ 模块4: 页面大标题                                        ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ HTML里改:                                             │    ║
+   ║  │   .page-icon  → 标题上方的 emoji 图标                 │    ║
+   ║  │   .page-title → 大标题文字                            │    ║
+   ║  │   .page-subtitle → 副标题文字                         │    ║
+   ║  │                                                       │    ║
+   ║  │ CSS里改:                                              │    ║
+   ║  │   .page-title font-size → 标题大小                    │    ║
+   ║  │   .page-title::after background → 装饰线颜色          │    ║
+   ║  │   .page-title::after height → 装饰线粗细              │    ║
+   ║  │   .page-subtitle color → 副标题颜色                   │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.page-header {
+  text-align: center;
+  margin-bottom: 44px;
+  position: relative;
+}
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: -20px; left: 50%;
+  transform: translateX(-50%);
+  width: 300px; height: 80px;
+  background: radial-gradient(ellipse, rgba(255,215,0,0.15), transparent 70%);
+  pointer-events: none;
+}
+.page-icon {
+  font-size: 56px;
+  display: inline-block;
+  margin-bottom: 6px;
+  animation: icon-float 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 14px rgba(255,165,0,0.25));
+}
+@keyframes icon-float {
+  0%,100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-10px) rotate(-4deg); }
+  66% { transform: translateY(-4px) rotate(4deg); }
+}
+.page-title {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: 8px;
+  display: inline-block;
+  color: var(--dark);
+  text-shadow: 3px 3px 0 var(--gold), 5px 5px 0 rgba(100,50,0,0.08);
+  position: relative;
+}
+.page-title::after {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: -12px; right: -12px;
+  height: 6px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+  border-radius: 3px;
+  border: 2px solid var(--outline);
+}
+.page-subtitle {
+  font-size: 12px;
+  color: var(--amber);
+  letter-spacing: 4px;
+  margin-top: 20px;
+  font-weight: 700;
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  📦 模块5: 分组区块（标题 + 按钮组）                           ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ HTML里改:                                             │    ║
+   ║  │   .section-label → 分组小标题文字                     │    ║
+   ║  │                                                       │    ║
+   ║  │ CSS里改:                                              │    ║
+   ║  │   .section-label background → 标签底色                │    ║
+   ║  │   .section-label color → 标签字色                     │    ║
+   ║  │   .section-label border-radius → 标签圆角             │    ║
+   ║  │   .section-group max-width → 内容最大宽度             │    ║
+   ║  │   .section-group margin-bottom → 区块间距             │    ║
+   ║  │                                                       │    ║
+   ║  │ 加新分组: 复制整个 <div class="section-group"> 块      │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.section-group {
+  max-width: 940px;
+  margin: 0 auto 48px;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s, transform 0.6s cubic-bezier(.22,1,.36,1);
+}
+.section-group.visible { opacity: 1; transform: translateY(0); }
+
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--dark);
+  margin-bottom: 20px;
+  padding: 10px 26px;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  border: 3px solid var(--outline);
+  border-radius: 30px;
+  box-shadow: 4px 4px 0 rgba(100,50,0,0.15);
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+.section-label::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: shine 4s ease-in-out infinite;
+}
+@keyframes shine { 0%{left:-100%} 40%{left:200%} 100%{left:200%} }
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🔲 模块6: 卡片网格                                          ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ grid-template-columns 的 minmax(195px,1fr)           │    ║
+   ║  │   → 改 195px 调卡片最小宽度                           │    ║
+   ║  │ gap: 18px → 改卡片间距                               │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 18px;
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🃏 模块7: 单张卡片（纯文字按钮）                              ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ HTML里改:                                             │    ║
+   ║  │   .card-name → 按钮主文字                            │    ║
+   ║  │   .card-desc → 按钮副文字                            │    ║
+   ║  │   href → 跳转链接                                    │    ║
+   ║  │   data-tip → 悬浮提示文字                            │    ║
+   ║  │                                                       │    ║
+   ║  │ CSS里改:                                              │    ║
+   ║  │   .card background → 卡片底色                        │    ║
+   ║  │   .card border → 描边粗细/颜色                       │    ║
+   ║  │   .card border-radius → 圆角                         │    ║
+   ║  │   .card box-shadow → 阴影                            │    ║
+   ║  │   .card min-height → 最小高度                        │    ║
+   ║  │   .card:hover → 悬浮效果                             │    ║
+   ║  │   .card-name font-size → 主文字大小                  │    ║
+   ║  │   .card-desc color → 副文字颜色                      │    ║
+   ║  │                                                       │    ║
+   ║  │ 加新按钮: 复制 <a class="card">...</a> 改内容即可     │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 16px;
+  background: var(--card-bg);
+  border: 3px solid var(--outline);
+  border-radius: 20px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--dark);
+  min-height: 120px;
+  box-shadow: 5px 5px 0 rgba(100,50,0,0.14);
+  transition: all 0.35s cubic-bezier(.22,1,.36,1);
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255,215,0,0.05), transparent);
+  border-radius: 17px 17px 0 0;
+  pointer-events: none;
+}
+.card:hover {
+  transform: translateY(-10px) rotate(-1deg);
+  box-shadow: 8px 12px 0 rgba(100,50,0,0.15), 0 0 0 3px var(--gold), 0 20px 40px rgba(255,165,0,0.1);
+  border-color: var(--gold-deep);
+}
+.card:hover::before { background: linear-gradient(180deg, rgba(255,215,0,0.1), transparent); }
+.card:active { transform: translateY(-3px) scale(0.97); box-shadow: 3px 3px 0 rgba(100,50,0,0.1); }
+
+.card-name {
+  font-size: 17px;
+  font-weight: 900;
+  text-align: center;
+  position: relative; z-index: 1;
+  letter-spacing: 2px;
+}
+.card-desc {
+  font-size: 12px;
+  color: var(--amber);
+  margin-top: 6px;
+  position: relative; z-index: 1;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* 音乐播放态 */
+.card.playing {
+  border-color: var(--pink);
+  box-shadow: 5px 5px 0 rgba(255,107,157,0.2), 0 0 0 3px var(--pink-light), 0 0 30px rgba(255,107,157,0.1);
+}
+.card.playing .card-name { animation: text-bounce 0.5s ease-in-out; }
+@keyframes text-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+/* 音频跳动条 */
+.audio-bars {
+  display: flex; gap: 3px; align-items: flex-end;
+  height: 18px; margin-top: 10px;
+  opacity: 0; transition: opacity 0.3s;
+}
+.card.playing .audio-bars { opacity: 1; }
+.audio-bar {
+  width: 4px;
+  background: var(--pink);
+  border-radius: 2px;
+  animation: bar-dance var(--d) ease-in-out infinite;
+}
+@keyframes bar-dance { 0%,100%{height:4px} 50%{height:18px} }
+
+/* 下载卡片左侧装饰条 */
+.card.download-card { border-left: 5px solid var(--gold-deep); }
+.card.download-card:hover { border-left-color: var(--pink); }
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🧭 模块8: 底部导航栏                                        ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ HTML里改:                                             │    ║
+   ║  │   .nav-icon → 导航图标 emoji                         │    ║
+   ║  │   .nav-label → 导航文字                               │    ║
+   ║  │   data-page → 对应页面索引(0=第一页, 1=第二页...)     │    ║
+   ║  │                                                       │    ║
+   ║  │ CSS里改:                                              │    ║
+   ║  │   .bottom-nav background → 导航栏底色                 │    ║
+   ║  │   .bottom-nav height → 导航栏高度                     │    ║
+   ║  │   .nav-btn padding → 按钮大小                        │    ║
+   ║  │   .nav-btn.active → 选中态样式                       │    ║
+   ║  │                                                       │    ║
+   ║  │ 加新导航: 复制一个 <button class="nav-btn"> 块        │    ║
+   ║  │   同时在 CSS 模块2改 width 为 400vw 等               │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(255,252,240,0.96), rgba(255,248,225,0.98));
+  border-top: 3px solid var(--outline);
+  z-index: 100;
+  padding: 0 20px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 -4px 16px rgba(255,165,0,0.06);
+}
+/* 扇贝装饰边 */
+.bottom-nav::before {
+  content: '';
+  position: absolute;
+  top: -14px; left: 0; right: 0;
+  height: 14px;
+  background:
+    radial-gradient(circle at 5% 100%, var(--gold) 7px, transparent 7px),
+    radial-gradient(circle at 15% 100%, var(--gold-light) 5px, transparent 5px),
+    radial-gradient(circle at 25% 100%, var(--gold) 7px, transparent 7px),
+    radial-gradient(circle at 35% 100%, var(--gold-light) 5px, transparent 5px),
+    radial-gradient(circle at 45% 100%, var(--gold) 7px, transparent 7px),
+    radial-gradient(circle at 55% 100%, var(--gold-light) 5px, transparent 5px),
+    radial-gradient(circle at 65% 100%, var(--gold) 7px, transparent 7px),
+    radial-gradient(circle at 75% 100%, var(--gold-light) 5px, transparent 5px),
+    radial-gradient(circle at 85% 100%, var(--gold) 7px, transparent 7px),
+    radial-gradient(circle at 95% 100%, var(--gold-light) 5px, transparent 5px);
+  pointer-events: none;
+}
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 32px;
+  background: transparent;
+  border: 3px solid transparent;
+  color: rgba(61,34,0,0.5);
+  cursor: pointer;
+  border-radius: 16px;
+  transition: all 0.35s cubic-bezier(.22,1,.36,1);
+  font-family: inherit;
+  position: relative;
+}
+.nav-btn .nav-icon { font-size: 24px; transition: transform 0.35s; }
+.nav-btn .nav-label { font-size: 12px; font-weight: 900; letter-spacing: 2px; }
+.nav-btn:hover { background: rgba(255,215,0,0.1); color: var(--dark); }
+.nav-btn:hover .nav-icon { transform: scale(1.2) translateY(-2px); }
+.nav-btn.active {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  border-color: var(--outline);
+  color: var(--dark);
+  box-shadow: 3px 4px 0 rgba(100,50,0,0.12);
+  transform: translateY(-4px);
+}
+.nav-btn.active .nav-icon { transform: scale(1.1); }
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  🔘 模块9: 关于按钮 & 右侧指示点                              ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ 关于按钮:                                             │    ║
+   ║  │   href → 改跳转链接                                   │    ║
+   ║  │   文字内容 → 改按钮文字                                │    ║
+   ║  │   bottom/right → 改位置                               │    ║
+   ║  │                                                       │    ║
+   ║  │ 指示点:                                               │    ║
+   ║  │   .scroll-dot 改大小(宽高)                            │    ║
+   ║  │   .scroll-dot.active 改选中色                         │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.about-btn {
+  position: fixed;
+  bottom: 98px; right: 24px;
+  width: 50px; height: 50px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  border: 3px solid var(--outline);
+  border-radius: 50%;
+  color: var(--dark);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 4px 4px 0 rgba(100,50,0,0.15);
+  transition: all 0.35s cubic-bezier(.22,1,.36,1);
+  text-decoration: none;
+  letter-spacing: 2px;
+  animation: about-pulse 3s ease-in-out infinite;
+}
+@keyframes about-pulse {
+  0%,100% { box-shadow: 4px 4px 0 rgba(100,50,0,0.15); }
+  50% { box-shadow: 4px 4px 0 rgba(100,50,0,0.15), 0 0 0 8px rgba(255,215,0,0.12); }
+}
+.about-btn:hover { transform: scale(1.15) rotate(-8deg); box-shadow: 6px 6px 0 rgba(100,50,0,0.18); }
+
+.scroll-hint {
+  position: fixed;
+  top: 50%; right: 18px;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.scroll-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 3px solid var(--outline);
+  transition: all 0.35s;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(100,50,0,0.06);
+}
+.scroll-dot.active {
+  background: var(--gold);
+  transform: scale(1.3);
+  box-shadow: 0 0 0 4px rgba(255,215,0,0.2);
+}
+.scroll-dot:hover { background: var(--gold-light); transform: scale(1.2); }
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  💬 模块10: 提示气泡 & 加载画面                               ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+.tooltip {
+  position: fixed;
+  padding: 10px 18px;
+  background: var(--white);
+  border: 3px solid var(--outline);
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dark);
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0;
+  transform: translateY(8px) scale(0.92);
+  transition: all 0.25s cubic-bezier(.22,1,.36,1);
+  box-shadow: 4px 4px 0 rgba(100,50,0,0.1);
+}
+.tooltip.show { opacity: 1; transform: translateY(0) scale(1); }
+
+.loading-screen {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, var(--cream), #FFF8DC);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.6s, visibility 0.6s;
+}
+.loading-screen.hide { opacity: 0; visibility: hidden; }
+.loading-ring {
+  width: 70px; height: 70px;
+  border: 4px solid rgba(255,215,0,0.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  margin-top: 20px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--dark);
+  letter-spacing: 4px;
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  📱 模块11: 响应式适配                                       ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ max-width: 600px → 手机断点                           │    ║
+   ║  │ 里面的属性会覆盖桌面端样式                              │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+@media (max-width: 600px) {
+  .page { padding: 28px 14px 140px; }
+  .page-title { font-size: 28px; letter-spacing: 4px; }
+  .page-icon { font-size: 42px; }
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; }
+  .card { padding: 22px 14px; min-height: 100px; border-width: 2px; }
+  .card-name { font-size: 14px; }
+  .nav-btn { padding: 10px 22px; }
+  .bottom-nav { height: 70px; }
+  .about-btn { bottom: 86px; right: 16px; width: 44px; height: 44px; }
+  .section-label { font-size: 15px; padding: 8px 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 背景层 -->
+<div class="bg-layer bg-sky"></div>
+<div class="bg-layer bg-grid"></div>
+<div class="bg-layer bg-diagonal"></div>
+
+<!-- 加载画面 -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-ring"></div>
+  <div class="loading-text">Loading ✦</div>
+</div>
+
+<!-- 页面指示点 -->
+<div class="scroll-hint">
+  <div class="scroll-dot active" data-page="0" title="网页"></div>
+  <div class="scroll-dot" data-page="1" title="音乐"></div>
+  <div class="scroll-dot" data-page="2" title="下载"></div>
+</div>
+
+<!-- 提示气泡 -->
+<div class="tooltip" id="tooltip"></div>
+
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  📝 模块12: 页面内容                                          ║
+     ║  ┌─────────────────────────────────────────────────────┐    ║
+     ║  │ 结构:                                                 │    ║
+     ║  │   <section class="page">    ← 一整页                 │    ║
+     ║  │     <div class="page-header"> ← 大标题区             │    ║
+     ║  │     <div class="section-group"> ← 一个分组           │    ║
+     ║  │       <div class="section-label"> ← 分组小标题       │    ║
+     ║  │       <div class="card-grid"> ← 按钮网格             │    ║
+     ║  │         <a class="card"> ← 单个按钮                  │    ║
+     ║  │           .card-name  ← 主文字                       │    ║
+     ║  │           .card-desc  ← 副文字                       │    ║
+     ║  │                                                       │    ║
+     ║  │ 加减页面:                                             │    ║
+     ║  │   1. 复制/删除 <section class="page"> 块             │    ║
+     ║  │   2. CSS模块2改 width (每页100vw)                    │    ║
+     ║  │   3. 导航栏加减对应 button                            │    ║
+     ║  │   4. 指示点加减对应 scroll-dot                        │    ║
+     ║  │   5. JS的 PAGE_COUNT 改总页数                        │    ║
+     ║  └─────────────────────────────────────────────────────┘    ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+<div id="app">
+
+  <!-- ====== 第1页: 网页 ====== -->
+  <section class="page" id="page-web">
+    <div class="page-header">
+      <div class="page-icon">🌐</div>
+      <h1 class="page-title">网 页</h1>
+      <p class="page-subtitle">WEB LINKS ✦ 精选网页导航</p>
+    </div>
+
+    <div class="section-group">
+      <div class="section-label">常用工具</div>
+
+      <div class="card-grid">
+        <a class="card" href="https://github.com" target="_blank" data-tip="代码托管平台">
+          <div class="card-name">GitHub</div>
+          <div class="card-desc">代码托管</div>
+        </a>
+      </div>
+    
+
+      <div class="card-grid">
+        <a class="card" href="https://www.bilibili.com/" target="_blank" data-tip="B站">
+          <div class="card-name">哔哩哔哩</div>
+          <div class="card-desc"></div>
+        </a>
+      </div>
+    
+
+      <div class="card-grid">
+        <a class="card" href="https://www.updream.cn" target="_blank" data-tip="AI工作流">
+          <div class="card-name">updream</div>
+          <div class="card-desc"></div>
+        </a>
+      </div>
+
+      <div class="card-grid">
+        <a class="card" href="https://chat.deepseek.com/" target="_blank" data-tip="鲸鱼">
+          <div class="card-name">Deepseek</div>
+          <div class="card-desc"></div>
+        </a>
+      </div>
+
+
+
+      <div class="card-grid">
+        <a class="card" href="https://www.fonts.net.cn/" target="_blank" data-tip="啥字体都有">
+          <div class="card-name">字体天下</div>
+          <div class="card-desc"></div>
+        </a>
+      </div>
+
+
+
+    </div>
+    <div style="height:60px"></div>
+  </section>
+
+  <!-- ====== 第2页: 音乐 ====== -->
+  <!-- ╔═══════════════════════════════════════════════════════════╗
+       ║  🎵 音乐页修改指南                                         ║
+       ║  ┌──────────────────────────────────────────────────┐    ║
+       ║  │                                                  │    ║
+       ║  │  ▸ 播放外部音乐文件:                               │    ║
+       ║  │    data-audio="https://xxx.com/song.mp3"         │    ║
+       ║  │    → 改成你的音频文件URL                           │    ║
+       ║  │    → 支持 mp3 / wav / ogg 格式                   │    ║
+       ║  │    → 可以用 GitHub raw 链接、网盘直链、CDN 链接    │    ║
+       ║  │                                                  │    ║
+       ║  │  ▸ 播放本地文件(相对路径):                         │    ║
+       ║  │    data-audio="./music/song.mp3"                 │    ║
+       ║  │    → 把音频文件放在网页同目录                       │    ║
+       ║  │    → GitHub Pages 会自动托管                      │    ║
+       ║  │                                                  │    ║
+       ║  │  ▸ 加新音乐按钮:                                  │    ║
+       ║  │    复制一个 <div class="card"> 块                 │    ║
+       ║  │    改 .card-name 和 data-audio 即可              │    ║
+       ║  │                                                  │    ║
+       ║  │  ▸ 同时播放多个: 不行，默认单曲播放                │    ║
+       ║  │    点同一个按钮 = 暂停，点不同按钮 = 切歌          │    ║
+       ║  │                                                  │    ║
+       ║  └──────────────────────────────────────────────────┘    ║
+       ╚═══════════════════════════════════════════════════════════╝ -->
+  <section class="page" id="page-music">
+    <div class="page-header">
+      <div class="page-icon">🎵</div>
+      <h1 class="page-title">音 乐</h1>
+      <p class="page-subtitle">MUSIC ✦ 点击播放</p>
+    </div>
+
+    <div class="section-group">
+      <div class="section-label">起床三部曲</div>
+      <div class="card-grid">
+        <!-- ▸▸▸ 改这里: data-audio 换成你的音频链接 ◂◂◂ -->
+        <div class="card" data-audio="lbf.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">鹿 Be free（降五调）</div>
+          <div class="card-desc">第一曲</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="syag.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">See you again</div>
+          <div class="card-desc">第二曲</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="mt.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">我们的明天</div>
+          <div class="card-desc">第三曲</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="section-group">
+      <div class="section-label">经典老歌</div>
+      <div class="card-grid">
+        <!-- ▸▸▸ 改这里: data-audio 换成你的音频链接 ◂◂◂ -->
+        <div class="card" data-audio="rf.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">让风告诉你</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="xw.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">希望拥有羽毛和翅膀</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="da.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">Da Capo</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="fd.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">赴大荒</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="cl.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">Evolve</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="xh.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">星河追梦</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="sf.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">扫福瑞</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+        <div class="card" data-audio="rr.mp3" data-tip="点击播放 · 再点暂停">
+          <div class="card-name">Rrhar'il</div>
+          <div class="card-desc">外部音频</div>
+          <div class="audio-bars">
+            <div class="audio-bar" style="--d:0.4s"></div>
+            <div class="audio-bar" style="--d:0.5s"></div>
+            <div class="audio-bar" style="--d:0.3s"></div>
+            <div class="audio-bar" style="--d:0.6s"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div style="height:60px"></div>
+  </section>
+
+  <!-- ====== 第3页: 下载 ====== -->
+  <section class="page" id="page-download">
+    <div class="page-header">
+      <div class="page-icon">📦</div>
+      <h1 class="page-title">下 载</h1>
+      <p class="page-subtitle">DOWNLOAD ✦ 资源下载</p>
+    </div>
+
+    <div class="section-group">
+  <div class="section-label">下载资源</div>
+  <div class="card-grid">
+    <a class="card download-card" href="tl.apk" download>
+      <div class="card-name">跳楼鸡</div>
+      <div class="card-desc">APK</div>
+    </a>
+    <a class="card download-card" href="zp1.png" download>
+      <div class="card-name">照片</div>
+      <div class="card-desc">测试文件</div>
+    </a>
+    <a class="card download-card" href="lbf.mp3" download>
+      <div class="card-name">鹿Befree（降调）</div>
+      <div class="card-desc">MP3 文件</div>
+    </a>
+  </div>
+</div>
+
+    <div style="height:60px"></div>
+  </section>
+
+</div>
+
+<!-- 底部导航 -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-page="0">
+    <span class="nav-icon">🌐</span>
+    <span class="nav-label">网页</span>
+  </button>
+  <button class="nav-btn" data-page="1">
+    <span class="nav-icon">🎵</span>
+    <span class="nav-label">音乐</span>
+  </button>
+  <button class="nav-btn" data-page="2">
+    <span class="nav-icon">📦</span>
+    <span class="nav-label">下载</span>
+  </button>
+</nav>
+
+<!-- 关于按钮 -->
+<a class="about-btn" href="https://handsomeludayi.github.io/dayitechnology/" target="_blank" title="关于">关于</a>
+
+
+<script>
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  ⚙️ JS模块A: 基础配置                                        ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ PAGE_COUNT → 总页数（必须和页面数量一致）             │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+const PAGE_COUNT = 3;
+let currentPage = 0, isTransitioning = false;
+
+window.addEventListener('load', () => {
+  setTimeout(() => document.getElementById('loadingScreen').classList.add('hide'), 700);
+  observeSections();
+});
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  ⚙️ JS模块B: 滚动入场动画                                    ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ threshold: 0.1 → 元素出现10%时触发                   │    ║
+   ║  │ rootMargin → 提前/延迟触发的像素值                    │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+function observeSections() {
+  const obs = new IntersectionObserver(es => {
+    es.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold:0.1, rootMargin:'0px 0px -50px 0px' });
+  document.querySelectorAll('.section-group').forEach(s => obs.observe(s));
+}
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  ⚙️ JS模块C: 页面切换                                        ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ 支持: 底部导航点击 / 右侧指示点点击                   │    ║
+   ║  │       键盘左右方向键 / 触摸左右滑动 / 鼠标滚轮        │    ║
+   ║  │                                                       │    ║
+   ║  │ 加新页面后:                                           │    ║
+   ║  │   1. 改 PAGE_COUNT                                    │    ║
+   ║  │   2. 加对应 nav-btn（data-page 从0开始）              │    ║
+   ║  │   3. 加对应 scroll-dot（data-page 从0开始）           │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+function goToPage(i) {
+  if (i < 0 || i >= PAGE_COUNT || isTransitioning) return;
+  isTransitioning = true; currentPage = i;
+  document.getElementById('app').style.transform = `translateX(-${i * 100}vw)`;
+  document.querySelectorAll('.nav-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+  document.querySelectorAll('.scroll-dot').forEach((d, j) => d.classList.toggle('active', j === i));
+  setTimeout(() => isTransitioning = false, 700);
+}
+document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => goToPage(+b.dataset.page)));
+document.querySelectorAll('.scroll-dot').forEach(d => d.addEventListener('click', () => goToPage(+d.dataset.page)));
+document.addEventListener('keydown', e => { if(e.key==='ArrowLeft') goToPage(currentPage-1); if(e.key==='ArrowRight') goToPage(currentPage+1); });
+let tx = 0, ty = 0;
+document.addEventListener('touchstart', e => { tx=e.touches[0].clientX; ty=e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) dx < 0 ? goToPage(currentPage+1) : goToPage(currentPage-1);
+}, {passive:true});
+document.addEventListener('wheel', e => {
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 30) e.deltaX > 0 ? goToPage(currentPage+1) : goToPage(currentPage-1);
+}, {passive:true});
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  ⚙️ JS模块D: 外部音频播放器                                   ║
+   ║  ┌─────────────────────────────────────────────────────┐    ║
+   ║  │ 工作原理:                                             │    ║
+   ║  │   读取卡片的 data-audio 属性 → 创建 HTML5 Audio 对象  │    ║
+   ║  │   点击播放，再点暂停，点另一首切换                      │    ║
+   ║  │                                                       │    ║
+   ║  │ 支持的音频源:                                         │    ║
+   ║  │   ✓ GitHub raw 链接                                   │    ║
+   ║  │     https://raw.githubusercontent.com/user/repo/main/song.mp3 │    ║
+   ║  │   ✓ 网盘直链（需支持直接访问）                         │    ║
+   ║  │   ✓ CDN / 对象存储链接                                │    ║
+   ║  │   ✓ 相对路径 ./music/song.mp3                         │    ║
+   ║  │   ✗ 需要登录的网盘（百度网盘分享页等不行）             │    ║
+   ║  │                                                       │    ║
+   ║  │ 常见问题:                                             │    ║
+   ║  │   Q: 播放没声音?                                      │    ║
+   ║  │   A: 浏览器要求用户交互后才能播放，第一次点即可        │    ║
+   ║  │                                                       │    ║
+   ║  │   Q: 跨域报错?                                        │    ║
+   ║  │   A: 音频服务器需允许跨域，或放在同源/GitHub Pages     │    ║
+   ║  │                                                       │    ║
+   ║  │   Q: 想自动播放?                                      │    ║
+   ║  │   A: 浏览器禁止自动播放，必须用户点击触发              │    ║
+   ║  └─────────────────────────────────────────────────────┘    ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+let currentAudioEl = null;
+let currentPlayingCard = null;
+
+function stopAudio() {
+  if (currentAudioEl) {
+    currentAudioEl.pause();
+    currentAudioEl.currentTime = 0;
+    currentAudioEl = null;
+  }
+  if (currentPlayingCard) {
+    currentPlayingCard.classList.remove('playing');
+    currentPlayingCard = null;
+  }
+}
+
+document.querySelectorAll('.card[data-audio]').forEach(card => {
+  card.addEventListener('click', () => {
+    // 点同一个 → 暂停
+    if (currentPlayingCard === card) {
+      stopAudio();
+      return;
+    }
+
+    // 停掉上一首
+    stopAudio();
+
+    // 播放新的
+    const src = card.dataset.audio;
+    const audio = new Audio(src);
+    audio.crossOrigin = 'anonymous';
+
+    card.classList.add('playing');
+    currentPlayingCard = card;
+    currentAudioEl = audio;
+
+    audio.play().catch(err => {
+      console.warn('播放失败:', err);
+      card.classList.remove('playing');
+      currentPlayingCard = null;
+      currentAudioEl = null;
+    });
+
+    // 播放结束 → 取消样式
+    audio.addEventListener('ended', () => {
+      if (currentPlayingCard === card) {
+        card.classList.remove('playing');
+        currentPlayingCard = null;
+        currentAudioEl = null;
+      }
+    });
+  });
+});
+
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  ⚙️ JS模块E: 提示气泡 & 涟漪效果                              ║
+   ╚══════════════════════════════════════════════════════════════╝ */
+const tooltip = document.getElementById('tooltip');
+document.querySelectorAll('[data-tip]').forEach(el => {
+  el.addEventListener('mouseenter', () => { tooltip.textContent = el.dataset.tip; tooltip.classList.add('show'); });
+  el.addEventListener('mousemove', e => { tooltip.style.left = e.clientX + 16 + 'px'; tooltip.style.top = e.clientY - 44 + 'px'; });
+  el.addEventListener('mouseleave', () => tooltip.classList.remove('show'));
+});
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('click', function(e) {
+    const r = document.createElement('div'), rect = this.getBoundingClientRect(), sz = Math.max(rect.width, rect.height);
+    r.style.cssText = `position:absolute;border-radius:50%;background:rgba(255,215,0,0.3);transform:scale(0);animation:rp .6s ease-out;pointer-events:none;width:${sz}px;height:${sz}px;left:${e.clientX-rect.left-sz/2}px;top:${e.clientY-rect.top-sz/2}px`;
+    this.appendChild(r); setTimeout(() => r.remove(), 600);
+  });
+});
+const st = document.createElement('style');
+st.textContent = '@keyframes rp{to{transform:scale(4);opacity:0}}';
+document.head.appendChild(st);
+</script>
+</body>
+</html>
